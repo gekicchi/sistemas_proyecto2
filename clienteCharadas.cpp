@@ -85,6 +85,7 @@ private:
             cout << "[Servidor] " << buffer << flush << endl;
     }
 };
+
 int main() 
 {
 	string nombreCliente;

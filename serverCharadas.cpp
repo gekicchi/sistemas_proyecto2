@@ -34,12 +34,13 @@ public:
         char buffer[BUFFERSIZE] = {0};
         char nombre[BUFFERSIZE] = {0};
         int primerMensaje = 1;
+        bool finalBucle = false;
 
         int random = rand() % WORDQUANTITY;
         string palabraSecreta = posiblesPalabras[random];
         string pista = "Pista: " + pistas[random];
 
-        while (true) 
+        while (!finalBucle) 
         {
             memset(buffer, 0, BUFFERSIZE);
             int valread = read(sockCliente, buffer, BUFFERSIZE);
@@ -62,6 +63,7 @@ public:
                     string mensajeFinal = "Correcto!";
                     send(sockCliente, mensajeFinal.c_str(), mensajeFinal.length(), 0);
                     cout << mensajeFinal << endl;
+                    finalBucle = true;
                     break;
                 }
 
