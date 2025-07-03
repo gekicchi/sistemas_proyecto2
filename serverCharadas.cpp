@@ -10,7 +10,7 @@
 
 
 //realizado por Matias Oyarzun y Matias Peters
-#define PUERTO 8000
+#define PUERTO 8001
 #define BUFFERSIZE 1024
 #define WORDQUANTITY 3
 
@@ -21,8 +21,10 @@ class SesionCliente
 {
     int sockCliente;
     sockaddr_in confCliente;
-    string posiblesPalabras[WORDQUANTITY] = {"frutilla", "gato", "mochila"};
-    string pistas[WORDQUANTITY] = {"pista 1", "pista 2", "pista 3"};
+    string posiblesPalabras[WORDQUANTITY] = {"frutilla\n", "gato\n", "conejito\n"};
+    string pistas[WORDQUANTITY] = {"fruta roja con semillas en su exterior\n", 
+        "animal domestico conocido por odiar a su amo\n", 
+        "animal domestico de orejas grandes, si fuera mas pequeño\n"};
 
 public:
     SesionCliente(int sock, sockaddr_in cliente) : sockCliente(sock), confCliente(cliente) {}
@@ -35,7 +37,7 @@ public:
 
         int random = rand() % WORDQUANTITY;
         string palabraSecreta = posiblesPalabras[random];
-        string pista = pistas[random];
+        string pista = "Pista: " + pistas[random];
 
         while (true) 
         {
@@ -46,9 +48,10 @@ public:
             if (primerMensaje) 
             {
                 strcpy(nombre, buffer);
-                string saludo = "Hola " + string(nombre) + "\nJugaremos a las Charadas" + "\nIntenta adivinar la palabra secreta";
-                send(sockCliente, saludo.c_str(), saludo.length(), 0);
-                cout << saludo << endl;
+                string saludo = "Hola " + string(nombre) + "\nJugaremos a las Charadas" + "\nIntenta adivinar la palabra secreta\n";
+                string mensajePrincipal = saludo + pista;
+                send(sockCliente, mensajePrincipal.c_str(), mensajePrincipal.length(), 0);
+                cout << mensajePrincipal << endl;
                 primerMensaje = 0;
             } 
             else 

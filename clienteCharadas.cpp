@@ -8,7 +8,7 @@
 
 
 //realizado por Matias Oyarzun y Matias Peters
-#define PUERTO 8000
+#define PUERTO 8001
 #define BUFFERSIZE 1024
 
 using namespace std;
