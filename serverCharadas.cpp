@@ -1,4 +1,4 @@
-// ServidorLab4.cpp
+// ServidorCharadas.cpp
 #include <iostream>
 #include <cstdlib>
 #include <thread>
@@ -10,7 +10,7 @@
 
 
 //realizado por Matias Oyarzun y Matias Peters
-#define PUERTO 8001
+#define PUERTO 8000
 #define BUFFERSIZE 1024
 #define WORDQUANTITY 3
 
@@ -53,7 +53,8 @@ public:
             } 
             else 
             {
-                if (comprobarPalabra(string(buffer),palabraSecreta)) 
+                string palabra = buffer;
+                if (comprobarPalabra(palabra,palabraSecreta)) 
                 {
                     string mensajeFinal = "Correcto!";
                     send(sockCliente, mensajeFinal.c_str(), mensajeFinal.length(), 0);
@@ -72,14 +73,11 @@ public:
     }
 
 private:
-    string invertirPalabra(const string& palabra)
-    {
-        return string(palabra.rbegin(), palabra.rend());
-    }
-
     bool comprobarPalabra(const string& palabra, const string& correcta)
     {
-        cout << palabra << " " << correcta;
+        cout << "pruebas: " << palabra << " " << correcta;
+        bool igual = palabra.compare(correcta);
+        cout << igual << endl;
         return palabra.compare(correcta) == 0;
     }
 };
@@ -107,7 +105,8 @@ public:
     }
 
 private:
-    void crearSocket() {
+    void crearSocket() 
+    {
         if ((sockServidor = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
         {
             perror("Error creando socket");
@@ -115,7 +114,8 @@ private:
         }
     }
 
-    void configurar() {
+    void configurar() 
+    {
         confServidor.sin_family = AF_INET;
         confServidor.sin_addr.s_addr = htonl(INADDR_ANY);
         confServidor.sin_port = htons(PUERTO);
@@ -127,7 +127,8 @@ private:
         }
     }
 
-    void escuchar(int n) {
+    void escuchar(int n) 
+    {
         if (listen(sockServidor, n) < 0) 
         {
             perror("Error en listen");
@@ -136,7 +137,8 @@ private:
         cout << "Servidor escuchando en el puerto " << PUERTO << "..." << endl;
     }
 
-    void aceptarCliente() {
+    void aceptarCliente() 
+    {
         sockaddr_in confCliente;
         socklen_t tamCliente = sizeof(confCliente);
         int sockCliente = accept(sockServidor, (struct sockaddr*)&confCliente, &tamCliente);

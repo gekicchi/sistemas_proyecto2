@@ -8,7 +8,7 @@
 
 
 //realizado por Matias Oyarzun y Matias Peters
-#define PUERTO 8001
+#define PUERTO 8000
 #define BUFFERSIZE 1024
 
 using namespace std;
@@ -55,7 +55,8 @@ public:
     }
 
 private:
-    void crearSocket() {
+    void crearSocket() 
+    {
         if ((sockCliente = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
         {
             perror("Error creando socket");
