@@ -1,4 +1,3 @@
-// ServidorCharadas.cpp
 #include <iostream>
 #include <cstdlib>
 #include <thread>
@@ -7,82 +6,89 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <iomanip>
+#include <algorithm>
+#include "GameBase.h"
 
-
-//realizado por Matias Oyarzun y Matias Peters
 #define PUERTO 8002
 #define BUFFERSIZE 1024
 #define WORDQUANTITY 3
 
 using namespace std;
 
-// ------------------------ Clase SesionCliente ------------------------
-class SesionCliente 
-{
+// ------------------------ Función auxiliar ------------------------
+string toLower(string str) {
+    transform(str.begin(), str.end(), str.begin(), ::tolower);
+    return str;
+}
+
+// ------------------------ Clase derivada CharadasGame ------------------------
+class CharadasGame : public GameBase {
     int sockCliente;
-    sockaddr_in confCliente;
-    string posiblesPalabras[WORDQUANTITY] = {"frutilla\n", "gato\n", "conejito\n"};
-    string pistas[WORDQUANTITY] = {"fruta roja con semillas en su exterior\n", 
-        "animal domestico conocido por odiar a su amo\n", 
-        "animal domestico de orejas grandes, si fuera mas pequeño\n"};
+    string posiblesPalabras[WORDQUANTITY] = {"frutilla", "gato", "conejito"};
+    string pistas[WORDQUANTITY] = {
+        "Fruta roja con semillas en su exterior",
+        "Animal doméstico conocido por odiar a su amo",
+        "Animal de orejas grandes, si fuera más pequeño"};
 
 public:
-    SesionCliente(int sock, sockaddr_in cliente) : sockCliente(sock), confCliente(cliente) {}
+    CharadasGame(int sock) : sockCliente(sock) {}
 
-    void atender() 
-    {
+    void startGame() override {
         char buffer[BUFFERSIZE] = {0};
-        char nombre[BUFFERSIZE] = {0};
-        int primerMensaje = 1;
+        string nombre;
+        int random;
 
-        int random = rand() % WORDQUANTITY;
-        string palabraSecreta = posiblesPalabras[random];
-        string pista = "Pista: " + pistas[random];
+        // Leer nombre del cliente
+        int valread = read(sockCliente, buffer, BUFFERSIZE);
+        if (valread <= 0) return;
+        nombre = string(buffer, valread);
+        nombre.erase(nombre.find_last_not_of("\n\r") + 1);
 
-        while (true) 
-        {
-            memset(buffer, 0, BUFFERSIZE);
-            int valread = read(sockCliente, buffer, BUFFERSIZE);
-            if (valread <= 0) break;
+        sendLine("Hola " + nombre + ", jugaremos a las Charadas.");
 
-            if (primerMensaje) 
-            {
-                strcpy(nombre, buffer);
-                string saludo = "Hola " + string(nombre) + "\nJugaremos a las Charadas" + "\nIntenta adivinar la palabra secreta\n";
-                string mensajePrincipal = saludo + pista;
-                send(sockCliente, mensajePrincipal.c_str(), mensajePrincipal.length(), 0);
-                cout << mensajePrincipal << endl;
-                primerMensaje = 0;
-            } 
-            else 
-            {
-                string palabra = buffer;
-                if (comprobarPalabra(palabra,palabraSecreta)) 
-                {
-                    string mensajeFinal = "Correcto!";
-                    send(sockCliente, mensajeFinal.c_str(), mensajeFinal.length(), 0);
-                    cout << mensajeFinal << endl;
+        do {
+            // Nueva palabra
+            random = rand() % WORDQUANTITY;
+            string palabraSecreta = posiblesPalabras[random];
+            string pista = "Pista: " + pistas[random];
+
+            sendLine(pista);
+
+            while (true) {
+                memset(buffer, 0, BUFFERSIZE);
+                int n = read(sockCliente, buffer, BUFFERSIZE);
+                if (n <= 0) return;
+
+                string intento = string(buffer, n);
+                intento.erase(intento.find_last_not_of("\n\r") + 1);
+
+                if (toLower(intento) == toLower(palabraSecreta)) {
+                    sendLine("¡Correcto!");
                     break;
+                } else {
+                    sendLine("Incorrecto. Intenta nuevamente:");
                 }
-
-                cout << buffer;
-                string respuesta = "Incorrecto, vuelve a intentarlo";
-
-                send(sockCliente, respuesta.c_str(), respuesta.length(), 0);
             }
-        }
 
+            sendLine("¿Quieres jugar otra vez? (s/n)");
+            memset(buffer, 0, BUFFERSIZE);
+            int n = read(sockCliente, buffer, BUFFERSIZE);
+            if (n <= 0) return;
+
+            string respuesta(buffer, n);
+            respuesta.erase(respuesta.find_last_not_of("\n\r") + 1);
+            if (respuesta != "s" && respuesta != "S") break;
+
+        } while (true);
+
+        sendLine("Gracias por jugar. ¡Hasta la próxima!");
         close(sockCliente);
     }
 
 private:
-    bool comprobarPalabra(const string& palabra, const string& correcta)
-    {
-        cout << "pruebas: " << palabra << " " << correcta;
-        bool igual = palabra.compare(correcta);
-        cout << igual << endl;
-        return palabra.compare(correcta) == 0;
+    void sendLine(const string& mensaje) {
+        string msg = mensaje + "\n";
+        send(sockCliente, msg.c_str(), msg.length(), 0);
     }
 };
 
@@ -93,88 +99,73 @@ class Servidor {
     vector<thread> clientes;
 
 public:
-    void iniciar(int cantidadClientes) 
-    {
+    void iniciar(int cantidadClientes) {
         crearSocket();
         configurar();
         escuchar(cantidadClientes);
 
-        for (int i = 0; i < cantidadClientes; ++i) 
+        for (int i = 0; i < cantidadClientes; ++i)
             aceptarCliente();
 
-        for (auto& cliente : clientes) 
+        for (auto& cliente : clientes)
             if (cliente.joinable()) cliente.join();
 
         close(sockServidor);
     }
 
 private:
-    void crearSocket() 
-    {
-        if ((sockServidor = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
-        {
+    void crearSocket() {
+        sockServidor = socket(AF_INET, SOCK_STREAM, 0);
+        if (sockServidor < 0) {
             perror("Error creando socket");
             exit(EXIT_FAILURE);
         }
     }
 
-    void configurar() 
-    {
+    void configurar() {
         confServidor.sin_family = AF_INET;
         confServidor.sin_addr.s_addr = htonl(INADDR_ANY);
         confServidor.sin_port = htons(PUERTO);
 
-        if (bind(sockServidor, (struct sockaddr*)&confServidor, sizeof(confServidor)) < 0) 
-        {
+        if (bind(sockServidor, (struct sockaddr*)&confServidor, sizeof(confServidor)) < 0) {
             perror("Error en bind");
             exit(EXIT_FAILURE);
         }
     }
 
-    void escuchar(int n) 
-    {
-        if (listen(sockServidor, n) < 0) 
-        {
+    void escuchar(int n) {
+        if (listen(sockServidor, n) < 0) {
             perror("Error en listen");
             exit(EXIT_FAILURE);
         }
         cout << "Servidor escuchando en el puerto " << PUERTO << "..." << endl;
     }
 
-    void aceptarCliente() 
-    {
+    void aceptarCliente() {
         sockaddr_in confCliente;
         socklen_t tamCliente = sizeof(confCliente);
         int sockCliente = accept(sockServidor, (struct sockaddr*)&confCliente, &tamCliente);
-        if (sockCliente < 0) 
-        {
+        if (sockCliente < 0) {
             perror("Error en accept");
-            exit(EXIT_FAILURE);
+            return;
         }
 
-        // Crear hebra para atender al cliente
-        clientes.emplace_back(&SesionCliente::atender, SesionCliente(sockCliente, confCliente));
+        clientes.emplace_back([sockCliente]() {
+            CharadasGame juego(sockCliente);
+            juego.startGame();
+        });
     }
 };
 
 // ------------------------ main() ------------------------
-int main(int argc, char* argv[]) 
-{
-    if (argc < 2) 
-    {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
         cerr << "Uso: " << argv[0] << " <cantidad_clientes>" << endl;
         return 1;
     }
 
     int cantidadClientes = atoi(argv[1]);
-    if (cantidadClientes <= 0) 
-    {
-        cerr << "Número inválido de clientes" << endl;
-        return 1;
-    }
-
     Servidor servidor;
     servidor.iniciar(cantidadClientes);
-
     return 0;
 }
