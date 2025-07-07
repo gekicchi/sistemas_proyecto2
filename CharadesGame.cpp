@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <algorithm>
 #include <cctype>
+#include <iomanip>
 
 std::string CharadesGame::trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \n\r\t");
@@ -44,18 +45,19 @@ bool CharadesGame::processClientInput(int clientSocket, const std::string& input
     std::string cleanedInput = toLower(trim(input));
     std::string cleanedSecret = toLower(trim(palabraSecreta));
 
-    std::cout << "DEBUG: Cliente adivino: '" << cleanedInput << "', Secreta: '" << cleanedSecret << "'" << std::endl;
+    // Mensaje de depuración traducido
+    std::cout << "[DEPURACIÓN Juego Charadas] Cliente adivinó: '" << cleanedInput << "', Secreta: '" << cleanedSecret << "'" << std::endl;
 
     if (cleanedInput == cleanedSecret) {
         std::string finalMessage = "Correcto! Has adivinado la palabra.\n";
         send(clientSocket, finalMessage.c_str(), finalMessage.length(), 0);
-        std::cout << "Cliente adivino la palabra: " << cleanedSecret << std::endl;
+        std::cout << "Cliente adivinó la palabra: " << cleanedSecret << std::endl;
         gameFinished = true;
         return true;
     } else {
         std::string response = "Incorrecto, vuelve a intentarlo.\n";
         send(clientSocket, response.c_str(), response.length(), 0);
-        std::cout << "Cliente intento '" << cleanedInput << "' - Incorrecto." << std::endl;
+        std::cout << "Cliente intentó '" << cleanedInput << "' - Incorrecto." << std::endl;
         return false;
     }
 }
@@ -63,7 +65,6 @@ bool CharadesGame::processClientInput(int clientSocket, const std::string& input
 void CharadesGame::resetGame() {
     int random = rand() % CHARADAS_WORD_QUANTITY;
     palabraSecreta = posiblesPalabras[random];
-    pistaActual = "Pista: " + pistas[random] + "\n";
-    gameFinished = false;
-    std::cout << "[DEBUG CharadesGame] Juego de Charadas reiniciado. Nueva palabra: " << palabraSecreta << std::endl;
+    pistaActual = pistas[random];
+    gameFinished = false; // Reiniciar el estado del juego
 }

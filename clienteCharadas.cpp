@@ -1,4 +1,3 @@
-// ClienteCharadas.cpp
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -6,12 +5,13 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+// CAMBIO AQUI: El puerto debe ser 8002 para que coincida con el servidor.
 #define PUERTO 8002
 #define BUFFERSIZE 1024
 
 using namespace std;
 
-class Cliente 
+class Cliente
 {
     int sockCliente;
     sockaddr_in confServidor;
@@ -20,26 +20,24 @@ class Cliente
 public:
     Cliente(const string& nombreCliente) : nombre(nombreCliente) {}
 
-    void conectar() 
+    void conectar()
     {
         crearSocket();
         configurarServidor();
         cout << "*****Conectado al servidor****[" << nombre << "]" << endl;
     }
 
-    void interactuar() 
+    void interactuar()
     {
         char buffer[BUFFERSIZE] = {0};
 
-        // Enviar nombre como primer mensaje
         send(sockCliente, nombre.c_str(), nombre.length(), 0);
-        
-        leerMensaje(); // Lee el mensaje de bienvenida y el menú inicial
+
+        leerMensaje();
 
     while (true)
     {
         cout << "[Cliente] ";
-        // AÑADE ESTA LÍNEA para forzar la impresión inmediata del prompt
         cout << flush;
         string entrada;
         getline(cin, entrada);
@@ -56,22 +54,22 @@ public:
     }
 
 private:
-    void crearSocket() 
+    void crearSocket()
     {
-        if ((sockCliente = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+        if ((sockCliente = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         {
             perror("Error creando socket");
             exit(EXIT_FAILURE);
         }
     }
 
-    void configurarServidor() 
+    void configurarServidor()
     {
         confServidor.sin_family = AF_INET;
         confServidor.sin_port = htons(PUERTO);
         confServidor.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-        if (connect(sockCliente, (struct sockaddr*)&confServidor, sizeof(confServidor)) < 0) 
+        if (connect(sockCliente, (struct sockaddr*)&confServidor, sizeof(confServidor)) < 0)
         {
             perror("Error en la conexión (configurar servidor)");
             exit(EXIT_FAILURE);
@@ -85,8 +83,7 @@ private:
 
     if (valread > 0) {
         cout << string(buffer, valread) << endl;
-        // AÑADE ESTA LÍNEA para forzar la impresión inmediata
-        cout << flush; 
+        cout << flush;
     } else if (valread == 0) {
         cout << "[DEBUG leerMensaje] Servidor cerró la conexión." << endl;
     } else {

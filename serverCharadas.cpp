@@ -7,10 +7,11 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <iomanip>
 
 
 //realizado por Matias Oyarzun y Matias Peters
-#define PUERTO 8001
+#define PUERTO 8002
 #define BUFFERSIZE 1024
 #define WORDQUANTITY 3
 

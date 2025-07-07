@@ -1,5 +1,3 @@
-// server.cpp
-
 #include <iostream>
 #include <cstdlib>
 #include <thread>
@@ -10,8 +8,10 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <map>
-#include <algorithm> 
-#include <cctype>    
+#include <algorithm>
+#include <cctype>
+#include <iomanip>
+#include <memory>
 
 #include "GameBase.h"
 #include "CharadesGame.h"
@@ -25,16 +25,14 @@ void sendMessage(int sock, const string& msg) {
     send(sock, msg.c_str(), msg.length(), 0);
 }
 
-
 std::string trimString(const std::string& str) {
     size_t first = str.find_first_not_of(" \n\r\t");
     if (std::string::npos == first) {
-        return ""; 
+        return "";
     }
     size_t last = str.find_last_not_of(" \n\r\t");
     return str.substr(first, (last - first + 1));
 }
-
 
 class SesionCliente {
     int sockCliente;
@@ -42,102 +40,126 @@ class SesionCliente {
     std::unique_ptr<GameBase> currentGame;
     string clientName;
 
+    enum class EstadoCliente {
+        EsperandoNombre,
+        EsperandoOpcionMenuInicial,
+        EnJuego,
+        EsperandoOpcionPostJuego
+    };
+
+    EstadoCliente estadoActual;
+
 public:
-    SesionCliente(int sock, sockaddr_in cliente) : sockCliente(sock), confCliente(cliente) {
-        currentGame = std::make_unique<CharadesGame>();
-    }
+    SesionCliente(int sock, sockaddr_in cliente) :
+        sockCliente(sock), confCliente(cliente),
+        currentGame(nullptr),
+        clientName(""),
+        estadoActual(EstadoCliente::EsperandoNombre)
+    {}
 
     void atender() {
         char buffer[BUFFERSIZE] = {0};
-        bool shouldExitSession = false;
+        int valread;
+        bool deberiaSalirSesion = false;
 
-        int valread = read(sockCliente, buffer, BUFFERSIZE);
-        if (valread <= 0) {
-            close(sockCliente);
-            return;
-        }
-        clientName = trimString(std::string(buffer, valread)); 
+        while (!deberiaSalirSesion) {
+            std::string entradaCliente;
 
-        sendMessage(sockCliente, "Hola " + clientName + "!\n");
-        sendMessage(sockCliente, "Bienvenido al servidor de juegos.\n");
-
-        
-        string initialMenuPrompt = "Elija una opcion:\n1. Jugar Charadas\n2. Salir\nIngrese su opcion: ";
-        sendMessage(sockCliente, initialMenuPrompt);
-
-        valread = read(sockCliente, buffer, BUFFERSIZE);
-        if (valread <= 0) {
-            cout << "Cliente " << clientName << " desconectado durante la seleccion inicial." << endl;
-            close(sockCliente);
-            return;
-        }
-        string initialChoice = trimString(std::string(buffer, valread));
-
-        if (initialChoice == "1") {
-            sendMessage(sockCliente, "Ha elegido jugar Charadas. ¡Mucha suerte!\n");
-        } else if (initialChoice == "2") {
-            sendMessage(sockCliente, "Saliendo del juego. ¡Adios!\n");
-            shouldExitSession = true;
-        } else {
-            sendMessage(sockCliente, "Opcion invalida. Saliendo del juego por defecto.\n");
-            shouldExitSession = true;
-        }
-
-        
-        while (!shouldExitSession) {
-            if (shouldExitSession) { 
-                break; 
-            }
-            
-            currentGame->startGame(sockCliente);
-
-            bool gameIsOver = false;
-            while (!gameIsOver && !shouldExitSession) {
+            if (estadoActual == EstadoCliente::EsperandoNombre) {
                 valread = read(sockCliente, buffer, BUFFERSIZE);
                 if (valread <= 0) {
-                    cout << "Cliente " << clientName << " desconectado." << endl;
-                    shouldExitSession = true;
-                    break;
+                    std::cerr << "Cliente desconectado o error al recibir nombre." << std::endl;
+                    deberiaSalirSesion = true;
+                    continue;
                 }
-                string clientInput = trimString(std::string(buffer, valread)); 
+                clientName = trimString(std::string(buffer, valread));
+                std::cout << "Nuevo cliente conectado. IP: " << inet_ntoa(confCliente.sin_addr) << ", Puerto: " << ntohs(confCliente.sin_port) << std::endl;
+                std::cout << "Nombre del cliente: " << clientName << std::endl;
+                estadoActual = EstadoCliente::EsperandoOpcionMenuInicial;
+            }
+            else if (estadoActual == EstadoCliente::EsperandoOpcionMenuInicial) {
+                std::string mensajeInicialCompleto =
+                    "Hola " + clientName + "!\n" +
+                    "Bienvenido al servidor de juegos.\n" +
+                    "Elija una opcion:\n" +
+                    "1. Jugar Charadas\n" +
+                    "2. Salir\n" +
+                    "Ingrese su opcion:\n";
+                sendMessage(sockCliente, mensajeInicialCompleto);
 
-                if (clientInput == "BYE") { 
-                    sendMessage(sockCliente, "Adios!\n");
-                    shouldExitSession = true;
-                    break;
+                valread = read(sockCliente, buffer, BUFFERSIZE);
+                if (valread <= 0) {
+                    std::cerr << "Cliente " << clientName << " desconectado o error al leer opción del menú inicial." << std::endl;
+                    deberiaSalirSesion = true;
+                    continue;
                 }
-                
-                gameIsOver = currentGame->processClientInput(sockCliente, clientInput);
-                
-                if (gameIsOver) {
-                    sendMessage(sockCliente, "El juego de Charadas ha terminado.\n");
-                    sendMessage(sockCliente, "Opciones:\n1. Jugar otra Charada\n2. Salir del juego\nIngrese su opcion: ");
+                entradaCliente = trimString(std::string(buffer, valread));
 
-                    valread = read(sockCliente, buffer, BUFFERSIZE);
-                    if (valread <= 0) {
-                        cout << "Cliente " << clientName << " desconectado mientras elegia opcion." << endl;
-                        shouldExitSession = true;
-                        break;
-                    }
-                    string choice = trimString(std::string(buffer, valread)); 
+                if (entradaCliente == "1") {
+                    currentGame = std::make_unique<CharadesGame>();
+                    std::cout << "[DEPURACIÓN CharadesGame] Juego de Charadas inicializado para " << clientName << ". Nombre del juego: " << currentGame->getGameName() << std::endl;
+                    currentGame->startGame(sockCliente);
+                    estadoActual = EstadoCliente::EnJuego;
+                } else if (entradaCliente == "2") {
+                    sendMessage(sockCliente, "Saliendo del servidor. ¡Adios!\n");
+                    deberiaSalirSesion = true;
+                } else {
+                    sendMessage(sockCliente, "Opcion invalida. Intente de nuevo.\n");
+                }
+            } else if (estadoActual == EstadoCliente::EnJuego) {
+                valread = read(sockCliente, buffer, BUFFERSIZE);
+                if (valread <= 0) {
+                    std::cerr << "Cliente " << clientName << " desconectado o error al leer adivinanza." << std::endl;
+                    deberiaSalirSesion = true;
+                    continue;
+                }
+                entradaCliente = trimString(std::string(buffer, valread));
 
-                    if (choice == "1") {
-                        static_cast<CharadesGame*>(currentGame.get())->resetGame();
-                        gameIsOver = false;
-                        sendMessage(sockCliente, "Iniciando nueva Charada...\n");
-                    } else if (choice == "2") {
-                        sendMessage(sockCliente, "Saliendo del juego. ¡Adios!\n");
-                        shouldExitSession = true;
-                    } else {
-                        sendMessage(sockCliente, "Opcion invalida. Saliendo del juego por defecto.\n");
-                        shouldExitSession = true;
+                if (currentGame) {
+                    bool juegoTerminado = currentGame->processClientInput(sockCliente, entradaCliente);
+                    if (juegoTerminado) {
+                        estadoActual = EstadoCliente::EsperandoOpcionPostJuego;
                     }
+                } else {
+                    sendMessage(sockCliente, "Error: No hay juego activo. Saliendo.\n");
+                    deberiaSalirSesion = true;
+                }
+            } else if (estadoActual == EstadoCliente::EsperandoOpcionPostJuego) {
+                // Antes de leer, asegura que el menú post-juego se haya enviado.
+                // Idealmente, esto lo hace processClientInput cuando el juego termina y gana/pierde.
+                // Si llegamos aquí por una opción inválida, lo enviamos de nuevo.
+                std::string mensajeMenuPostJuego =
+                    "El juego de Charadas ha terminado.\n" +
+                    "Opciones:\n" +
+                    "1. Jugar otra Charada\n" +
+                    "2. Salir del juego\n" +
+                    "Ingrese su opcion:\n";
+                sendMessage(sockCliente, mensajeMenuPostJuego);
+
+                valread = read(sockCliente, buffer, BUFFERSIZE);
+                if (valread <= 0) {
+                    std::cerr << "Cliente " << clientName << " desconectado o error al leer opción del menú post-juego." << std::endl;
+                    deberiaSalirSesion = true;
+                    continue;
+                }
+                entradaCliente = trimString(std::string(buffer, valread));
+
+                if (entradaCliente == "1") {
+                    static_cast<CharadesGame*>(currentGame.get())->resetGame();
+                    std::cout << "[DEPURACIÓN CharadesGame] Juego de Charadas reiniciado. Nueva palabra generada para " << clientName << "." << std::endl;
+                    currentGame->startGame(sockCliente);
+                    estadoActual = EstadoCliente::EnJuego;
+                } else if (entradaCliente == "2") {
+                    sendMessage(sockCliente, "Saliendo del juego. ¡Adios!\n");
+                    deberiaSalirSesion = true;
+                } else {
+                    sendMessage(sockCliente, "Opcion invalida. Intente de nuevo.\n");
+                    // Permanece en el mismo estado para que el menú post-juego se muestre de nuevo.
                 }
             }
         }
-
         close(sockCliente);
-        cout << "Sesion de cliente " << clientName << " finalizada y socket cerrado." << endl;
+        std::cout << "Sesión de cliente " << clientName << " finalizada y socket cerrado." << std::endl;
     }
 };
 
@@ -147,21 +169,24 @@ class Servidor {
     vector<thread> clientes;
 
 public:
-    Servidor() {
+    void iniciar(int cantidadClientes) {
         crearSocket();
-        configurarServidor();
-    }
+        configurar();
+        escuchar(cantidadClientes);
 
-    ~Servidor() {
-        close(sockServidor);
-        for (thread& t : clientes) {
-            if (t.joinable()) {
-                t.join();
+        for (int i = 0; i < cantidadClientes; ++i) {
+            aceptarCliente();
+        }
+
+        for (auto& cliente : clientes) {
+            if (cliente.joinable()) {
+                cliente.join();
             }
         }
-        cout << "Servidor cerrado." << endl;
+        close(sockServidor);
     }
 
+private:
     void crearSocket() {
         if ((sockServidor = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             perror("Error creando socket");
@@ -169,7 +194,7 @@ public:
         }
     }
 
-    void configurarServidor() {
+    void configurar() {
         confServidor.sin_family = AF_INET;
         confServidor.sin_addr.s_addr = INADDR_ANY;
         confServidor.sin_port = htons(PUERTO);
@@ -198,7 +223,6 @@ public:
         }
 
         clientes.emplace_back(&SesionCliente::atender, SesionCliente(sockCliente, confCliente));
-        cout << "Nuevo cliente conectado. IP: " << inet_ntoa(confCliente.sin_addr) << ", Puerto: " << ntohs(confCliente.sin_port) << endl;
     }
 };
 
@@ -217,14 +241,7 @@ int main(int argc, char* argv[]) {
     }
 
     Servidor miServidor;
-    miServidor.escuchar(cantidadClientes);
-
-    if (cantidadClientes == 1) {
-        miServidor.aceptarCliente();
-    } else {
-        cout << "Configurado para multiples clientes, pero la logica actual solo acepta uno." << endl;
-        cout << "Para aceptar multiples, descomente el bucle de aceptacion." << endl;
-    }
+    miServidor.iniciar(cantidadClientes);
 
     return 0;
 }
