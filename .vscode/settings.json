@@ -2,6 +2,6 @@
     "files.associations": {
         "iostream": "cpp",
         "xstring": "cpp",
-        "xlocmes": "cpp"
+        "iomanip": "cpp"
     }
 }

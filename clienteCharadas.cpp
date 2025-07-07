@@ -5,6 +5,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+
+//realizado por Matias Oyarzun y Matias Peters
+#define PUERTO 8001
 // CAMBIO AQUI: El puerto debe ser 8002 para que coincida con el servidor.
 #define PUERTO 8002
 #define BUFFERSIZE 1024
@@ -32,9 +35,15 @@ public:
         char buffer[BUFFERSIZE] = {0};
 
         send(sockCliente, nombre.c_str(), nombre.length(), 0);
+        leerMensaje();
 
         leerMensaje();
 
+        while (true) 
+        {
+            cout << "[Cliente] ";
+            string entrada;
+            getline(cin, entrada);
     while (true)
     {
         cout << "[Cliente] ";
@@ -42,13 +51,13 @@ public:
         string entrada;
         getline(cin, entrada);
 
-        entrada += "\n";
-        send(sockCliente, entrada.c_str(), entrada.length(), 0);
+            entrada += "\n";
+            send(sockCliente, entrada.c_str(), entrada.length(), 0);
 
-        leerMensaje();
-        if (entrada == "BYE\n")
-            break;
-    }
+            leerMensaje();
+            if (entrada == "BYE\n") 
+                break;
+        }
 
         close(sockCliente);
     }
@@ -71,11 +80,17 @@ private:
 
         if (connect(sockCliente, (struct sockaddr*)&confServidor, sizeof(confServidor)) < 0)
         {
-            perror("Error en la conexión (configurar servidor)");
+            perror("Error en la    conexión (configurar servidor)");
             exit(EXIT_FAILURE);
         }
     }
 
+    void leerMensaje() 
+    {
+        char buffer[BUFFERSIZE] = {0};
+        int valread = read(sockCliente, buffer, BUFFERSIZE);
+        if (valread > 0)
+            cout << "[Servidor] " << buffer << flush << endl;
     void leerMensaje()
 {
     char buffer[BUFFERSIZE] = {0};
@@ -90,18 +105,17 @@ private:
         perror("Error en read");
         exit(EXIT_FAILURE);
     }
-}
 };
 
-int main(int argc, char const* argv[]) {
-    if (argc < 2) {
-        cerr << "Uso: " << argv[0] << " <nombre_cliente>" << endl;
-        return 1;
-    }
+int main() 
+{
+	string nombreCliente;
+	cout << "Ingrese su nombre: ";
+	getline(cin, nombreCliente);
 
-    Cliente cliente(argv[1]);
-    cliente.conectar();
-    cliente.interactuar();
+	Cliente cliente(nombreCliente);
+	cliente.conectar();
+	cliente.interactuar();
 
-    return 0;
-}
+	return 0;
+}	
