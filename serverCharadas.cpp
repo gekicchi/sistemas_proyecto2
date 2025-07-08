@@ -15,13 +15,11 @@
 
 using namespace std;
 
-// ------------------------ Función auxiliar ------------------------
 string toLower(string str) {
     transform(str.begin(), str.end(), str.begin(), ::tolower);
     return str;
 }
 
-// ------------------------ Clase derivada CharadasGame ------------------------
 class CharadasGame : public GameBase {
     int sockCliente;
     string posiblesPalabras[WORDQUANTITY] = {"frutilla", "gato", "conejito"};
@@ -47,11 +45,10 @@ public:
         sendLine("Hola " + nombre + ", jugaremos a las Charadas.");
 
         do {
-            // Nueva palabra
+            srand(time(nullptr) + sockCliente);
             random = rand() % WORDQUANTITY;
             string palabraSecreta = posiblesPalabras[random];
             string pista = "Pista: " + pistas[random];
-
             sendLine(pista);
 
             while (true) {
@@ -92,23 +89,21 @@ private:
     }
 };
 
-// ------------------------ Clase Servidor ------------------------
 class Servidor {
     int sockServidor;
     sockaddr_in confServidor;
-    vector<thread> clientes;
 
 public:
-    void iniciar(int cantidadClientes) {
+    void iniciar() {
         crearSocket();
         configurar();
-        escuchar(cantidadClientes);
+        escuchar();
 
-        for (int i = 0; i < cantidadClientes; ++i)
+        cout << "Servidor escuchando en el puerto " << PUERTO << "..." << endl;
+
+        while (true) {
             aceptarCliente();
-
-        for (auto& cliente : clientes)
-            if (cliente.joinable()) cliente.join();
+        }
 
         close(sockServidor);
     }
@@ -133,39 +128,33 @@ private:
         }
     }
 
-    void escuchar(int n) {
-        if (listen(sockServidor, n) < 0) {
+    void escuchar() {
+        if (listen(sockServidor, 10) < 0) {
             perror("Error en listen");
             exit(EXIT_FAILURE);
         }
-        cout << "Servidor escuchando en el puerto " << PUERTO << "..." << endl;
     }
 
     void aceptarCliente() {
         sockaddr_in confCliente;
         socklen_t tamCliente = sizeof(confCliente);
         int sockCliente = accept(sockServidor, (struct sockaddr*)&confCliente, &tamCliente);
+        cout << "Nuevo cliente conectado. Creando hebra..." << endl;
         if (sockCliente < 0) {
             perror("Error en accept");
             return;
         }
 
-        clientes.emplace_back([sockCliente]() {
+        // Crear y soltar hebra
+        thread([sockCliente]() {
             CharadasGame juego(sockCliente);
             juego.startGame();
-        });
+        }).detach();
     }
 };
 
-// ------------------------ main() ------------------------
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        cerr << "Uso: " << argv[0] << " <cantidad_clientes>" << endl;
-        return 1;
-    }
-
-    int cantidadClientes = atoi(argv[1]);
+int main() {
     Servidor servidor;
-    servidor.iniciar(cantidadClientes);
+    servidor.iniciar();
     return 0;
 }
